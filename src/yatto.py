@@ -248,13 +248,22 @@ def parse_tudou_danmaku(url):
     return danmaku_url
 
 
+danmaku_parsers = {'tudou.com': parse_tudou_danmaku}
+
+
 def parse_video(url, quality):
     name, urls = Flvcd.parse(url, quality)
     danmaku_url = ''
 
+    danmaku_parser = None
     host = urllib.parse.urlparse(url).hostname
-    if host.find('tudou.com') > -1:
-        danmaku_url = parse_tudou_danmaku(url)
+    for k, v in danmaku_parsers.items():
+        if host.find(k) > -1:
+            danmaku_parser = v
+            break
+
+    if danmaku_parser:
+        danmaku_url = danmaku_parser(url)
 
     return name, urls, danmaku_url
 
