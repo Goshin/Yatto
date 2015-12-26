@@ -224,7 +224,6 @@ def ReadCommentsTudou2(f, fontsize):
                 int(prop.get('color', 0xffffff)), size, (c.count('\n') + 1) * size, CalculateLength(c) * size)
         except (AssertionError, AttributeError, IndexError, TypeError, ValueError):
             logging.warning(_('Invalid comment: %r') % comment)
-            traceback.print_exc()
             continue
 
 
