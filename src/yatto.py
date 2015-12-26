@@ -230,7 +230,7 @@ def launch_player(video_name, media_urls, comment_out):
     if len(media_urls) > 1:
         command_line += ['--cache=1000', '--cache-backbuffer=1000', '--cache-secs=5', '--merge-files']
     if comment_out and comment_out.name:
-        command_line += ['--sub-fps=60', '--sub-ass', '--sub-file', comment_out.name]
+        command_line += ['--no-video-aspect', '--sub-ass', '--sub-file', comment_out.name]
 
     command_line += media_urls
     player_process = subprocess.Popen(command_line)
