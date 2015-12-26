@@ -278,7 +278,11 @@ def main():
             danmaku_file = convert_comments(danmaku_url, get_video_size(video_url))
         except Exception as e:
             traceback.print_exc()
-            logger.error('download danmaku {} failed, {}'.format(danmaku_url, e))
+            logger.error('Download danmaku {} failed, {}'.format(danmaku_url, e))
+
+    if not len(video_url):
+        logger.error('Parse video page failed')
+        exit(0)
 
     logger.info('Buffering video header, this may take a while')
     launch_player(name, video_url, danmaku_file)
