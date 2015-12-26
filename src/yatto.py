@@ -11,6 +11,8 @@ import traceback
 import http.client as httplib
 import urllib.request as urllib2
 import urllib.parse
+import gzip
+import zlib
 
 DEFAULT_USER_AGENT = "Mozilla/5.0 (Windows NT 10.0) AppleWebKit/537.36 (KHTML, \
                       like Gecko) Chrome/47.0.2526.106 Safari/537.36"
@@ -18,8 +20,20 @@ DEFAULT_USER_AGENT = "Mozilla/5.0 (Windows NT 10.0) AppleWebKit/537.36 (KHTML, \
 logger = logging.getLogger(__name__)
 
 
-def simple_get_url(url):
-    return urllib2.urlopen(url).read()
+def simply_get_url(url):
+    request = urllib2.Request(url)
+    request.add_header('User-Agent', DEFAULT_USER_AGENT)
+
+    response = urllib2.urlopen(request)
+
+    content_encoding = response.getheader('Content-Encoding')
+    if content_encoding == 'gzip':
+        return gzip.GzipFile(fileobj=response).read()
+    elif content_encoding == 'deflate':
+        decompressobj = zlib.decompressobj(-zlib.MAX_WBITS)
+        return decompressobj.decompress(response.read()) + decompressobj.flush()
+    else:
+        return response.read()
 
 
 class Flvcd(object):
@@ -186,7 +200,7 @@ def get_video_size(media_urls):
 
 
 def convert_comments(danmaku_url, video_size):
-    resp_comment = simple_get_url(danmaku_url)
+    resp_comment = simply_get_url(danmaku_url)
     comment_in = io.StringIO(resp_comment.decode('utf-8', 'replace'))
     comment_out = tempfile.NamedTemporaryFile(mode='w', encoding='utf-8-sig', newline='\r\n', prefix='tmp-danmaku2ass-',
                                               suffix='.ass', delete=False)
@@ -238,7 +252,7 @@ def launch_player(video_name, media_urls, comment_out):
 
 
 def parse_tudou_danmaku(url):
-    page = simple_get_url(url).decode('utf-8')
+    page = simply_get_url(url).decode('utf-8')
     iid_re = re.compile(r',iid: (\d+)')
     match = iid_re.search(page)
     danmaku_url = ''
@@ -248,7 +262,18 @@ def parse_tudou_danmaku(url):
     return danmaku_url
 
 
-danmaku_parsers = {'tudou.com': parse_tudou_danmaku}
+def parse_bilibili_danmaku(url):
+    page = simply_get_url(url).decode('utf-8')
+    cid_re = re.compile(r'cid=(\d+)')
+    match = cid_re.search(page)
+    danmaku_url = ''
+    if match:
+        logger.info('Bilibili danmaku detected')
+        danmaku_url = 'http://comment.bilibili.com/{}.xml'.format(match.group(1))
+    return danmaku_url
+
+
+danmaku_parsers = {'tudou.com': parse_tudou_danmaku, 'bilibili.com': parse_bilibili_danmaku}
 
 
 def parse_video(url, quality):
