@@ -2,8 +2,6 @@
 
 Parse and play online video on local player
 
-![Screenshot](screenshot.png)
-
 ---
 
 ## Features
