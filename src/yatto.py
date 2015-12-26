@@ -273,7 +273,19 @@ def parse_bilibili_danmaku(url):
     return danmaku_url
 
 
-danmaku_parsers = {'tudou.com': parse_tudou_danmaku, 'bilibili.com': parse_bilibili_danmaku}
+def parse_acfun_danmaku(url):
+    page = simply_get_url(url).decode('utf-8')
+    cid_re = re.compile(r'''data-vid=['"](\d+)['"]''')
+    match = cid_re.search(page)
+    danmaku_url = ''
+    if match:
+        logger.info('Acfun danmaku detected')
+        danmaku_url = 'http://danmu.aixifan.com/V2/' + match.group(1)
+    return danmaku_url
+
+
+danmaku_parsers = {'tudou.com': parse_tudou_danmaku, 'bilibili.com': parse_bilibili_danmaku,
+                   'acfun': parse_acfun_danmaku}
 
 
 def parse_video(url, quality):
