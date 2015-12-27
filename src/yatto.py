@@ -212,7 +212,7 @@ def convert_comments(danmaku_url_or_raw, video_size):
     d2a_args = dict({'stage_width': video_size[0], 'stage_height': video_size[1], 'font_face': 'SimHei',
                      'font_size': math.ceil(video_size[1] / 21.6), 'text_opacity': 0.8,
                      'duration_marquee': min(max(6.75 * video_size[0] / video_size[1] - 4, 3.0), 8.0),
-                     'duration_still': 5.0}, **d2aflags)
+                     'duration_still': 5.0, 'reserve_blank': video_size[1] // 10}, **d2aflags)
     for i, j in ((('stage_width', 'stage_height', 'reserve_blank'), int),
                  (('font_size', 'text_opacity', 'comment_duration', 'duration_still', 'duration_marquee'), float)):
         for k in i:
