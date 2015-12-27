@@ -199,8 +199,11 @@ def get_video_size(media_urls):
         return 0, 0
 
 
-def convert_comments(danmaku_url, video_size):
-    resp_comment = simply_get_url(danmaku_url)
+def convert_comments(danmaku_url_or_raw, video_size):
+    if isinstance(danmaku_url_or_raw, str):
+        resp_comment = simply_get_url(danmaku_url_or_raw)
+    else:
+        resp_comment = danmaku_url_or_raw
     comment_in = io.StringIO(resp_comment.decode('utf-8', 'replace'))
     comment_out = tempfile.NamedTemporaryFile(mode='w', encoding='utf-8-sig', newline='\r\n', prefix='tmp-danmaku2ass-',
                                               suffix='.ass', delete=False)
@@ -253,13 +256,28 @@ def launch_player(video_name, media_urls, comment_out):
 
 def parse_tudou_danmaku(url):
     page = simply_get_url(url).decode('utf-8')
-    iid_re = re.compile(r',iid: (\d+)')
-    match = iid_re.search(page)
-    danmaku_url = ''
-    if match:
-        logger.info('Tudou danmaku detected')
-        danmaku_url = 'http://service.danmu.tudou.com/list?mat=0&mcount=5&ct=1001&uid=0&iid=' + match.group(1)
-    return danmaku_url
+    iid_match = re.search(r',iid: (\d+)', page)
+    time_match = re.search(r',time: \'(\d+)', page)
+    if not iid_match or not time_match:
+        return ''
+
+    iid = iid_match.group(1)
+    time = time_match.group(1)
+    logger.info('Tudou danmaku detected')
+
+    danmaku_pool = {'result': []}
+    # Download and merge every 5 minute danmaku segments
+    segments_num = (int(time) + 1) // 5
+    for i in range(0, int(time) + 1, 5):
+        logger.info('Processing danmaku segment {}/{}'.format(i // 5, segments_num))
+        danmaku_url = 'http://service.danmu.tudou.com/list?mat={}&mcount=5&ct=1001&uid=0&iid={}'.format(i, iid)
+        segment_raw = simply_get_url(danmaku_url).decode('utf-8')
+        segment = json.loads(segment_raw or '{}')
+        if not segment.get('count', 0):
+            continue
+        danmaku_pool['result'].extend(segment.get('result', []))
+
+    return json.dumps(danmaku_pool).encode('utf-8')
 
 
 def parse_bilibili_danmaku(url):
@@ -314,17 +332,17 @@ def main():
     logging.basicConfig(level='INFO', format='%(asctime)s - %(levelname)s - %(message)s')
 
     logger.info('Parsing page...')
-    name, video_url, danmaku_url = parse_video(args.url, args.quality)
+    name, video_url, danmaku = parse_video(args.url, args.quality)
 
     danmaku_file = ''
-    if danmaku_url:
+    if danmaku:
         # convert danmaku to ASS
         try:
             logger.info('Fetching danmaku')
-            danmaku_file = convert_comments(danmaku_url, get_video_size(video_url))
+            danmaku_file = convert_comments(danmaku, get_video_size(video_url))
         except Exception as e:
             traceback.print_exc()
-            logger.error('Download danmaku {} failed, {}'.format(danmaku_url, e))
+            logger.error('Download danmaku failed, {}'.format(e))
 
     if not len(video_url):
         logger.error('Parse video page failed')
