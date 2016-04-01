@@ -27,13 +27,14 @@ def simply_get_url(url):
     response = urllib2.urlopen(request)
 
     content_encoding = response.getheader('Content-Encoding')
-    if content_encoding == 'gzip':
-        return gzip.GzipFile(fileobj=response).read()
+    raw_data = response.read()
+    if content_encoding == 'gzip' or raw_data.startswith(b'\x1F\x8B'):
+        return zlib.decompress(raw_data, 16 + zlib.MAX_WBITS)
     elif content_encoding == 'deflate':
         decompressobj = zlib.decompressobj(-zlib.MAX_WBITS)
-        return decompressobj.decompress(response.read()) + decompressobj.flush()
+        return decompressobj.decompress(raw_data) + decompressobj.flush()
     else:
-        return response.read()
+        return raw_data
 
 
 class Flvcd(object):
