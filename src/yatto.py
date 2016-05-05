@@ -6,12 +6,13 @@ import json
 import subprocess
 import io
 import tempfile
+
+from pip._vendor.requests.packages import chardet
+
 import danmaku2ass
 import traceback
-import http.client as httplib
 import urllib.request as urllib2
 import urllib.parse
-import gzip
 import zlib
 
 DEFAULT_USER_AGENT = "Mozilla/5.0 (Windows NT 10.0) AppleWebKit/537.36 (KHTML, \
@@ -37,127 +38,36 @@ def simply_get_url(url):
         return raw_data
 
 
-class Flvcd(object):
-    """ JavaScript from flvcd.com
-
-    function createSc(a, t) {
-        var b = "26499035657058937199857879755120";
-        t = Math.floor(t / (600 * 1000));
-        ret = "";
-        for (var i = 0; i < a.length; i++) {
-            var j = a.charCodeAt(i) ^ b.charCodeAt(i) ^ t;
-            j = j % 'z'.charCodeAt(0);
-            var c;
-            if (j < '0'.charCodeAt(0)) {
-                c = String.fromCharCode('0'.charCodeAt(0) + j % 9)
-            } else if (j >= '0'.charCodeAt(0) && j <= '9'.charCodeAt(0)) {
-                c = String.fromCharCode(j)
-            } else if (j > '9'.charCodeAt(0) && j < 'A'.charCodeAt(0)) {
-                c = '9'
-            } else if (j >= 'A'.charCodeAt(0) && j <= 'Z'.charCodeAt(0)) {
-                c = String.fromCharCode(j)
-            } else if (j > 'Z'.charCodeAt(0) && j < 'a'.charCodeAt(0)) {
-                c = 'Z'
-            } else if (j >= 'z'.charCodeAt(0) && j <= 'z'.charCodeAt(0)) {
-                c = String.fromCharCode(j)
-            } else {
-                c = 'z'
-            }
-            ret += c
-        }
-        return ret
-    }
-    """
-
-    @staticmethod
-    def create_sc(a, t, b):
-        t = int(math.floor(int(t) / (600 * 1000)))
-        ret = ""
-        for i in range(len(a)):
-            j = ord(a[i]) ^ ord(b[i]) ^ t
-            j %= ord('z')
-            if j < ord('0'):
-                c = chr(ord('0') + j % 9)
-            elif ord('0') <= j <= ord('9'):
-                c = chr(j)
-            elif ord('9') < j < ord('A'):
-                c = '9'
-            elif ord('A') <= j <= ord('Z'):
-                c = chr(j)
-            elif ord('Z') < j < ord('a'):
-                c = 'Z'
-            elif ord('z') <= j <= ord('z'):
-                c = chr(j)
-            else:
-                c = 'z'
-            ret += c
-        return ret
-
-    @staticmethod
-    def fetch_page(url, quality=1):
-        quality_dict = {1: 'normal', 2: 'high', 3: 'super'}
-        url = 'http://www.flvcd.com/parse.php?go=1&kw={}&format={}'.format(url, quality_dict.get(quality))
-        conn = httplib.HTTPConnection("www.flvcd.com", 80)
-        h = {"Host": "www.flvcd.com",
-             "User-Agent": DEFAULT_USER_AGENT}
-        conn.request("GET", url, headers=h)
-        result = conn.getresponse()
-        page = result.read().decode('GBK')
-
-        ad_flag_re = re.compile(r'height:50px; background-color:#FF9966;')
-        if not ad_flag_re.search(page):
-            return page
-
-        aaa_re = re.compile(r'[a-zA-Z]+=\'(\w{32})\'')
-        bbb_re = re.compile(r'[a-zA-Z]+=(\d{13})')
-        b_re = re.compile(r'for\|(\d*)\|createSc')
-
-        aaa = aaa_re.search(page)
-        bbb = bbb_re.search(page)
-        b = b_re.search(page)
-
-        if not aaa or not bbb or not b:
-            logger.error('Bypass flvcd AD failed')
-            return ''
-
-        g = Flvcd.create_sc(aaa.group(1), bbb.group(1), b.group(1))
-        h['Cookie'] = 'go=' + g + '; avdGggggtt=' + bbb.group(1)
-
-        conn.request("GET", url, headers=h)
-        result = conn.getresponse()
-        page = result.read().decode('GBK')
-
-        return page
-
-    """Function from MoonPlayer
-    Link: https://github.com/coslyk/moonplayer/blob/master/src/plugins/moonplayer_utils.py
-    License: GPL 3.0
-    """
-
-    @staticmethod
-    def parse_page(content):
-        url_re = re.compile(r'<a href="(http://.+?)".+?onclick=.+?>\s*http://')
-        name_re = re.compile(r'document.title\s*=\s*"([^"]+)"')
-        page = content
-        ret = []
-
-        # get name
-        match = name_re.search(page)
-        if not match:
-            return
-        name = match.group(1)
-
-        # get urls
-        match = url_re.search(page)
-        while match:
-            url = match.group(1)
-            ret.append(url)  # url
-            match = url_re.search(page, match.end(0))
-        return name, ret
-
-    @staticmethod
-    def parse(url, quality):
-        return Flvcd.parse_page(Flvcd.fetch_page(url, quality))
+def you_get(url, print_info, extra_args):
+    try:
+        command = ['you-get', '-u']
+        if print_info:
+            command.append('-i')
+        if extra_args:
+            command.append(extra_args)
+        command.append(url)
+        process = subprocess.Popen(command, stdout=subprocess.PIPE)
+        try:
+            output = process.communicate()[0]
+            output = output.decode(chardet.detect(output).get('encoding', 'utf-8'), 'replace')
+        except KeyboardInterrupt:
+            process.terminate()
+            return '', []
+        if print_info:
+            print(output)
+            return '', []
+        name_match = re.compile(r'title:\s*(.*?)(\r|\n)').search(output)
+        name = name_match.group(1) if name_match else 'Unknown'
+        url_re = re.compile(r'\n(http.*?)(\r|\n)')
+        url_match = url_re.search(output)
+        video_url = []
+        while url_match:
+            video_url.append(url_match.group(1))
+            url_match = url_re.search(output, url_match.end(0))
+        return name, video_url
+    except Exception as e:
+        logger.error('parse video failed {}'.format(e))
+        return '', []
 
 
 """Functions(get_video_size, convert_comments, launch_player) from BiliDan
@@ -307,8 +217,8 @@ danmaku_parsers = {'tudou.com': parse_tudou_danmaku, 'bilibili.com': parse_bilib
                    'acfun': parse_acfun_danmaku}
 
 
-def parse_video(url, quality):
-    name, urls = Flvcd.parse(url, quality)
+def parse_video(url, print_info, extra_args):
+    name, urls = you_get(url, print_info, extra_args)
     danmaku_url = ''
 
     danmaku_parser = None
@@ -318,7 +228,7 @@ def parse_video(url, quality):
             danmaku_parser = v
             break
 
-    if danmaku_parser:
+    if danmaku_parser and not print_info:
         danmaku_url = danmaku_parser(url)
 
     return name, urls, danmaku_url
@@ -327,13 +237,18 @@ def parse_video(url, quality):
 def main():
     parser = argparse.ArgumentParser()
     parser.add_argument('url', metavar='URL')
-    parser.add_argument('-q', '--quality', default=3, type=int,
-                        help='Specify video quality, 1 for normal quality, 2 for high quality, 3 for ultra high quality')
+    parser.add_argument('-i', '--info', default=False, action='store_true',
+                        help='Show the format and quality information of the video')
+    parser.add_argument('-e', '--extra', default='', type=str,
+                        help='Specify the you-get options, like --extra="--format=hd"')
     args = parser.parse_args()
     logging.basicConfig(level='INFO', format='%(asctime)s - %(levelname)s - %(message)s')
 
     logger.info('Parsing page...')
-    name, video_url, danmaku = parse_video(args.url, args.quality)
+    name, video_url, danmaku = parse_video(args.url, args.info, args.extra)
+
+    if args.info:
+        return
 
     danmaku_file = ''
     if danmaku:
@@ -354,4 +269,7 @@ def main():
 
 
 if __name__ == '__main__':
-    main()
+    try:
+        main()
+    except KeyboardInterrupt:
+        logger.info('Canceled')
