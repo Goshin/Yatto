@@ -133,8 +133,8 @@ def convert_comments(danmaku_url_or_raw, video_size):
         danmaku2ass.Danmaku2ASS([comment_in], comment_out, **d2a_args)
     except Exception as e:
         logging.error('Danmaku2ASS failed, comments are disabled. {}'.format(e))
-        comment_out.flush()
-        comment_out.close()  # Close the temporary file early to fix an issue related to Windows NT file sharing
+    comment_out.flush()
+    comment_out.close()  # Close the temporary file early to fix an issue related to Windows NT file sharing
     return comment_out
 
 
