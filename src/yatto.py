@@ -165,6 +165,32 @@ def launch_player(video_name, media_urls, comment_out):
         return player_process.returncode
 
 
+def parse_youku_danmaku(url):
+    page = simply_get_url(url).decode('utf-8')
+    video_id_match = re.search(r'videoId\s+=\s+\'(\d+)', page)
+    video_seconds_match = re.search(r'videoSeconds\s+=\s+Math\.round\((\d+)', page)
+    if not video_id_match or not video_seconds_match:
+        return ''
+
+    video_id = video_id_match.group(1)
+    video_seconds = int(video_seconds_match.group(1)) / 60
+    logger.info('Youku danmaku detected')
+
+    danmaku_pool = {'result': []}
+    # Download and merge every 5 minute danmaku segments
+    segments_num = (int(video_seconds) + 1) // 5
+    for i in range(0, int(video_seconds) + 1, 5):
+        logger.info('Processing danmaku segment {}/{}'.format(i // 5, segments_num))
+        danmaku_url = 'http://service.danmu.youku.com/list?mat={}&mcount=5&ct=1001&uid=0&iid={}'.format(i, video_id)
+        segment_raw = simply_get_url(danmaku_url).decode('utf-8')
+        segment = json.loads(segment_raw or '{}')
+        if not segment.get('count', 0):
+            continue
+        danmaku_pool['result'].extend(segment.get('result', []))
+
+    return json.dumps(danmaku_pool).encode('utf-8')
+
+
 def parse_tudou_danmaku(url):
     page = simply_get_url(url).decode('utf-8')
     iid_match = re.search(r',iid: (\d+)', page)
@@ -214,7 +240,7 @@ def parse_acfun_danmaku(url):
 
 
 danmaku_parsers = {'tudou.com': parse_tudou_danmaku, 'bilibili.com': parse_bilibili_danmaku,
-                   'acfun': parse_acfun_danmaku}
+                   'acfun': parse_acfun_danmaku, 'youku': parse_youku_danmaku}
 
 
 def parse_video(url, print_info, extra_args):

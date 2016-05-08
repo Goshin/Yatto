@@ -7,7 +7,7 @@ Parse and play online video with danmaku on local player.
 ## Features
 
 - Merge video segments as a single video file.
-- Danmaku supported: Tudou, Acfun, Bilibili
+- Danmaku supported: Youku, Tudou, Acfun, Bilibili
 
 ## Requirements
 
