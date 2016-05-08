@@ -58,7 +58,7 @@ def you_get(url, print_info, extra_args):
             return '', []
         name_match = re.compile(r'title:\s*(.*?)(\r|\n)').search(output)
         name = name_match.group(1) if name_match else 'Unknown'
-        url_re = re.compile(r'\n(http.*?)(\r|\n)')
+        url_re = re.compile(r'(http.*?)(\r|\n)')
         url_match = url_re.search(output)
         video_url = []
         while url_match:
